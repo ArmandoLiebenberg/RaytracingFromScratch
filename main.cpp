@@ -1,6 +1,6 @@
 #include <SDL2/SDL.h>
-#include<array>
 #include <valarray>
+#include <string>
 
 #define CANVAS_WIDTH 600
 #define CANVAS_HEIGHT 600
@@ -41,10 +41,18 @@ typedef struct Sphere {
     Vec3i color {};
 } Sphere;
 
+typedef struct Light {
+    std::string type;
+    float intensity;
+    Vec3 direction;
+} Light;
+
+
+
 void draw_pixel(SDL_Renderer* renderer, int x, int y, int r, int g, int b);
 Vec3 view_to_canvas(int canvas_x, int canvas_y);
 Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[]);
-Vec2 intersectRaySphere(Vec3 origin, Vec3 Transformed, Sphere sphere);
+Vec2 intersectRaySphere(Vec3 origin, Vec3 direction, Sphere sphere);
 
 int main() {
 
@@ -62,13 +70,16 @@ int main() {
     SDL_RenderClear(renderer);
 
     // ---------- Model Code ------------------------
-    Sphere red_circle = {{0,-1.0,3}, 1, {255,0,0}};
-    Sphere green_circle = {{2.0,0,4}, 1, {0, 255,0}};
-    Sphere blue_circle = {{-2.0,0,4}, 1, {0,0,255}};
+    Sphere red_circle = {{0,-1,3}, 1, {255,0,0}};
+    Sphere green_circle = {{0,0,4}, 1, {0, 255,0}};
+    Sphere blue_circle = {{0,1,5}, 1, {0,0,255}};
     Sphere scene[3] = {red_circle, green_circle, blue_circle};
 
+    Light ambient = {std::string {"ambient"}, 0.2, Vec3 {0,0,0}};
+    Light point = {std::string {"point"}, 0.6, Vec3 {2,1,0}};
+    Light directional = {std::string {"directional"}, 0.2, Vec3 {1,4,4}};
+    Light lights[3] = {ambient, point, directional};
 
-    std::array<Sphere,3> Scene{red_circle, green_circle, blue_circle};
     // ---------- End Model Code --------------------
 
     // ---------- Graphics Code ------------------------
