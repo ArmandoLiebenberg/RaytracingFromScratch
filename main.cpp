@@ -2,11 +2,12 @@
 #include <valarray>
 #include <string>
 
-#define CANVAS_WIDTH 600
-#define CANVAS_HEIGHT 600
+#define CANVAS_WIDTH 720
+#define CANVAS_HEIGHT 680
 #define VIEW_WIDTH 1.0
 #define VIEW_HEIGHT 1.0
-#define DISTANCE 1
+#define DISTANCE 1.0
+#define OBJECTS 6
 
 class Vec3 {
 public:
@@ -16,14 +17,34 @@ public:
         return Vec3 {x - b.x, y - b.y, z - b.z};
     }
 
+    Vec3 add(Vec3 b) {
+        return Vec3 {x + b.x, y + b.y, z + b.z};
+    }
+
+    Vec3 multiplyScalar(float a) {
+        return Vec3 {x * a, y * a, z * a};
+    }
+
+    Vec3 flipped() {
+        return Vec3 {-x, -y, -z};
+    }
+
     float dot(Vec3 b) {
         return (x * b.x) + (y * b.y) + (z * b.z);
+    }
+
+    float length() {
+        return sqrt(x*x + y*y + z*z);
     }
 };
 
 class Vec3i {
 public:
     int r,g,b;
+
+    Vec3i multiplyScalar(float a) {
+        return Vec3i {static_cast<int>(r * a), static_cast<int>(g * a), static_cast<int>(b * a)};
+    }
 };
 
 class Vec2 {
@@ -39,6 +60,7 @@ typedef struct Sphere {
     Vec3 centre {};
     float radius {};
     Vec3i color {};
+    int specular{};
 } Sphere;
 
 typedef struct Light {
@@ -47,12 +69,19 @@ typedef struct Light {
     Vec3 direction;
 } Light;
 
+typedef struct Object {
+    struct object;
+    std::string objectType;
+} Object;
 
 
+// FUNCTION DECLARATIONS ---------------------------------------------------
 void draw_pixel(SDL_Renderer* renderer, int x, int y, int r, int g, int b);
 Vec3 view_to_canvas(int canvas_x, int canvas_y);
-Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[]);
+Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[], Light lights[]);
 Vec2 intersectRaySphere(Vec3 origin, Vec3 direction, Sphere sphere);
+double ComputeLighting(Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular);
+// -------------------------------------------------------------------------
 
 int main() {
 
@@ -70,10 +99,13 @@ int main() {
     SDL_RenderClear(renderer);
 
     // ---------- Model Code ------------------------
-    Sphere red_circle = {{0,-1,3}, 1, {255,0,0}};
-    Sphere green_circle = {{0,0,4}, 1, {0, 255,0}};
-    Sphere blue_circle = {{0,1,5}, 1, {0,0,255}};
-    Sphere scene[3] = {red_circle, green_circle, blue_circle};
+    Sphere redCircle = {{0,-0.5,3}, 0.5, {255,0,0}, 500 };
+    Sphere blueCircle = {{0,0.0,3}, 0.5, {0,0,255}, -1};
+    Sphere greenCircle = {{0,0.5,3}, 0.5, {0, 255,0}, 10};
+    Sphere yellowCircle = {{0,-5001,3}, 5000, {255,255,0}, -1};
+    Sphere eye1 = {{0.2,0.5,2.5}, 0.1, {255,30,125}, 5000};
+    Sphere eye2 = {{-0.2,0.5,2.5}, 0.1, {255,30,125}, 5000};
+    Sphere scene[OBJECTS] = {redCircle, greenCircle, blueCircle, yellowCircle, eye1, eye2};
 
     Light ambient = {std::string {"ambient"}, 0.2, Vec3 {0,0,0}};
     Light point = {std::string {"point"}, 0.6, Vec3 {2,1,0}};
@@ -93,7 +125,7 @@ int main() {
             Vec3 transformed = view_to_canvas(x, y);
 
             // Determine the color seen through that grid square
-            Vec3i color = trace_ray(origin, transformed, 1, 1000, scene);
+            Vec3i color = trace_ray(origin, transformed, 1, 1000, scene, lights);
 
             // Paint the square with that color
             draw_pixel(renderer, x, y, color.r, color.g, color.b);
@@ -103,7 +135,7 @@ int main() {
     // Render The Stuff
     while (true) {
         SDL_RenderPresent(renderer);
-        SDL_Delay(13);
+        SDL_Delay(200);
     }
 
 }
@@ -139,12 +171,12 @@ Vec3 view_to_canvas(int canvas_x, int canvas_y) {
  * -----------------------
  * Calculates ray outwards from camera through viewport
  */
-Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[]) {
+Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[], Light lights[]) {
     float closestT = std::numeric_limits<float>::infinity();
     Sphere closestSphere = {{0,0,0}, 0, {0,0,0}};
     int found = 0;
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 6; i++) {
         Sphere sphere = scene[i];
         Vec2 tValues = intersectRaySphere(origin, transformed, sphere);
 
@@ -165,9 +197,18 @@ Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere sc
         return Vec3i {255, 255, 255};
     }
 
-    return closestSphere.color;
+    Vec3 point = origin.add(transformed.multiplyScalar(closestT));  // Compute intersection
+    Vec3 normal = point.subtract(closestSphere.centre); // Compute sphere normal at intersection
+    normal = normal.multiplyScalar(1/normal.length()); // unit normal
+
+    return closestSphere.color.multiplyScalar(std::clamp(ComputeLighting(point, normal, transformed.flipped(), lights, closestSphere.specular), 0.0, 1.0));
 }
 
+/* intersectRaySphere()
+ * ----------------------
+ * Given a ray from a point with a given direction, check to see if it intersects with a given
+ * sphere object
+ */
 Vec2 intersectRaySphere(Vec3 origin, Vec3 direction, Sphere sphere) {
     float r = sphere.radius;
     Vec3 CO = origin.subtract(sphere.centre);
@@ -188,3 +229,38 @@ Vec2 intersectRaySphere(Vec3 origin, Vec3 direction, Sphere sphere) {
     return Vec2 {t1, t2};
 }
 
+double ComputeLighting(Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular) {
+    double intensity = 0.0;
+
+    for (int i = 0; i < 3; i++) {
+        Light light = lights[i];
+
+        if (light.type == "ambient") {
+            intensity += light.intensity;
+        } else {
+            Vec3 L{};
+            if (light.type == "point") {
+                L = light.direction.subtract(point);
+            }
+             if (light.type == "directional") {
+                L = light.direction;
+            }
+
+            // diffuse lighting
+            float nDotL = normal.dot(L);
+            if (nDotL > 0) {
+                intensity += light.intensity * nDotL/(normal.length() * L.length());
+            }
+
+            // specular lighting
+            if (specular != -1) {
+                Vec3 R = ((normal.multiplyScalar(2)).multiplyScalar(normal.dot(L))).subtract(L);
+                float rDotV = R.dot(view);
+                if (rDotV > 0) {
+                    intensity += light.intensity * pow(rDotV / (R.length() * view.length()), specular);
+                }
+            }
+        }
+    }
+    return intensity;
+}
