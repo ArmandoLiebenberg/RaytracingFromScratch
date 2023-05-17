@@ -69,18 +69,19 @@ typedef struct Light {
     Vec3 direction;
 } Light;
 
-typedef struct Object {
-    struct object;
-    std::string objectType;
-} Object;
-
+typedef struct TracedSphere {
+    Sphere closestSphere {};
+    float closestT {std::numeric_limits<float>::infinity()};
+    int found {0};
+} TracedSphere;
 
 // FUNCTION DECLARATIONS ---------------------------------------------------
 void draw_pixel(SDL_Renderer* renderer, int x, int y, int r, int g, int b);
 Vec3 view_to_canvas(int canvas_x, int canvas_y);
 Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[], Light lights[]);
 Vec2 intersectRaySphere(Vec3 origin, Vec3 direction, Sphere sphere);
-double ComputeLighting(Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular);
+double ComputeLighting(TracedSphere tracedSphere, Sphere scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular);
+TracedSphere closest_intersection(TracedSphere tracedSphere, Sphere scene[], Vec3 origin, Vec3 transformed, float tMin, float tMax);
 // -------------------------------------------------------------------------
 
 int main() {
@@ -99,17 +100,15 @@ int main() {
     SDL_RenderClear(renderer);
 
     // ---------- Model Code ------------------------
-    Sphere redCircle = {{0,-0.5,3}, 0.5, {255,0,0}, 500 };
-    Sphere blueCircle = {{0,0.0,3}, 0.5, {0,0,255}, -1};
-    Sphere greenCircle = {{0,0.5,3}, 0.5, {0, 255,0}, 10};
+    Sphere redCircle = {{0,-0.5,3}, 1, {255,0,0}, 500 };
+    Sphere blueCircle = {{2,0.0,4}, 1, {0,0,255}, -1};
+    Sphere greenCircle = {{-2,0.0,4}, 1, {0, 255,0}, 10};
     Sphere yellowCircle = {{0,-5001,3}, 5000, {255,255,0}, -1};
-    Sphere eye1 = {{0.2,0.5,2.5}, 0.1, {255,30,125}, 5000};
-    Sphere eye2 = {{-0.2,0.5,2.5}, 0.1, {255,30,125}, 5000};
-    Sphere scene[OBJECTS] = {redCircle, greenCircle, blueCircle, yellowCircle, eye1, eye2};
+    Sphere scene[OBJECTS] = {redCircle, greenCircle, blueCircle, yellowCircle};
 
     Light ambient = {std::string {"ambient"}, 0.2, Vec3 {0,0,0}};
     Light point = {std::string {"point"}, 0.6, Vec3 {2,1,0}};
-    Light directional = {std::string {"directional"}, 0.2, Vec3 {1,4,4}};
+    Light directional = {std::string {"directional"}, 0.0, Vec3 {1,4,4}};
     Light lights[3] = {ambient, point, directional};
 
     // ---------- End Model Code --------------------
@@ -172,36 +171,18 @@ Vec3 view_to_canvas(int canvas_x, int canvas_y) {
  * Calculates ray outwards from camera through viewport
  */
 Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[], Light lights[]) {
-    float closestT = std::numeric_limits<float>::infinity();
-    Sphere closestSphere = {{0,0,0}, 0, {0,0,0}};
-    int found = 0;
+    TracedSphere tracedSphere = {Sphere {{0,0,0}, 0, {0,0,0}},
+                                 std::numeric_limits<float>::infinity(), 0};
+    tracedSphere = closest_intersection(tracedSphere, scene, origin, transformed, tMin, tMax);
 
-    for (int i = 0; i < 6; i++) {
-        Sphere sphere = scene[i];
-        Vec2 tValues = intersectRaySphere(origin, transformed, sphere);
-
-        if ((tValues.t1 < tMax) && (tMin < tValues.t1) && (tValues.t1 < closestT)) {
-            closestT = tValues.t1;
-            closestSphere = sphere;
-            found = 1;
-        }
-
-        if ((tValues.t2 < tMax) && (tMin < tValues.t2) && (tValues.t2 < closestT)) {
-            closestT = tValues.t2;
-            closestSphere = sphere;
-            found = 1;
-        }
-    }
-
-    if (!found) {
+    if (!tracedSphere.found) {
         return Vec3i {255, 255, 255};
     }
-
-    Vec3 point = origin.add(transformed.multiplyScalar(closestT));  // Compute intersection
-    Vec3 normal = point.subtract(closestSphere.centre); // Compute sphere normal at intersection
+    Vec3 point = origin.add(transformed.multiplyScalar(tracedSphere.closestT));  // Compute intersection
+    Vec3 normal = point.subtract(tracedSphere.closestSphere.centre); // Compute sphere normal at intersection
     normal = normal.multiplyScalar(1/normal.length()); // unit normal
 
-    return closestSphere.color.multiplyScalar(std::clamp(ComputeLighting(point, normal, transformed.flipped(), lights, closestSphere.specular), 0.0, 1.0));
+    return tracedSphere.closestSphere.color.multiplyScalar(std::clamp(ComputeLighting(tracedSphere, scene, point, normal, transformed.flipped(), lights, tracedSphere.closestSphere.specular), 0.0, 1.0));
 }
 
 /* intersectRaySphere()
@@ -229,7 +210,7 @@ Vec2 intersectRaySphere(Vec3 origin, Vec3 direction, Sphere sphere) {
     return Vec2 {t1, t2};
 }
 
-double ComputeLighting(Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular) {
+double ComputeLighting(TracedSphere tracedSphere, Sphere scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular) {
     double intensity = 0.0;
 
     for (int i = 0; i < 3; i++) {
@@ -239,11 +220,20 @@ double ComputeLighting(Vec3 point, Vec3 normal, Vec3 view, Light lights[], int s
             intensity += light.intensity;
         } else {
             Vec3 L{};
+            float tMax = 0;
             if (light.type == "point") {
                 L = light.direction.subtract(point);
+                tMax = 1;
             }
              if (light.type == "directional") {
                 L = light.direction;
+                tMax = std::numeric_limits<float>::infinity();
+            }
+
+            // Shadow check
+            TracedSphere shadow = closest_intersection(TracedSphere {.found = 0}, scene, point, L, 0.001, tMax);
+            if (shadow.found) {
+                continue;
             }
 
             // diffuse lighting
@@ -263,4 +253,24 @@ double ComputeLighting(Vec3 point, Vec3 normal, Vec3 view, Light lights[], int s
         }
     }
     return intensity;
+}
+
+TracedSphere closest_intersection(TracedSphere tracedSphere, Sphere scene[], Vec3 origin, Vec3 transformed, float tMin, float tMax) {
+    for (int i = 0; i < OBJECTS; i++) {
+        Sphere sphere = scene[i];
+        Vec2 tValues = intersectRaySphere(origin, transformed, sphere);
+
+        if ((tValues.t1 < tMax) && (tMin < tValues.t1) && (tValues.t1 < tracedSphere.closestT)) {
+            tracedSphere.closestT = tValues.t1;
+            tracedSphere.closestSphere = sphere;
+            tracedSphere.found = 1;
+        }
+
+        if ((tValues.t2 < tMax) && (tMin < tValues.t2) && (tValues.t2 < tracedSphere.closestT)) {
+            tracedSphere.closestT = tValues.t2;
+            tracedSphere.closestSphere = sphere;
+            tracedSphere.found = 1;
+        }
+    }
+    return tracedSphere;
 }
