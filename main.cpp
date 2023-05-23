@@ -1,87 +1,30 @@
+// Libraries
 #include <SDL2/SDL.h>
 #include <valarray>
 #include <string>
 
-#define CANVAS_WIDTH 720
-#define CANVAS_HEIGHT 680
-#define VIEW_WIDTH 1.0
+// Renderer
+#include "renderer_math.h"
+#include "objects.h"
+
+#define CANVAS_WIDTH 1920
+#define CANVAS_HEIGHT 1080
+#define VIEW_WIDTH 1.9
 #define VIEW_HEIGHT 1.0
 #define DISTANCE 1.0
 #define OBJECTS 6
 
-class Vec3 {
-public:
-    float x,y,z;
-
-    Vec3 subtract(Vec3 b) {
-        return Vec3 {x - b.x, y - b.y, z - b.z};
-    }
-
-    Vec3 add(Vec3 b) {
-        return Vec3 {x + b.x, y + b.y, z + b.z};
-    }
-
-    Vec3 multiplyScalar(float a) {
-        return Vec3 {x * a, y * a, z * a};
-    }
-
-    Vec3 flipped() {
-        return Vec3 {-x, -y, -z};
-    }
-
-    float dot(Vec3 b) {
-        return (x * b.x) + (y * b.y) + (z * b.z);
-    }
-
-    float length() {
-        return sqrt(x*x + y*y + z*z);
-    }
-};
-
-class Vec3i {
-public:
-    int r,g,b;
-
-    Vec3i multiplyScalar(float a) {
-        return Vec3i {static_cast<int>(r * a), static_cast<int>(g * a), static_cast<int>(b * a)};
-    }
-};
-
-class Vec2 {
-public:
-    float t1, t2;
-};
-
-/* Sphere
- * ------------------------
- * A sphere object with coordinates and details about its shape and color
- */
-typedef struct Sphere {
-    Vec3 centre {};
-    float radius {};
-    Vec3i color {};
-    int specular{};
-} Sphere;
-
-typedef struct Light {
-    std::string type;
-    float intensity;
-    Vec3 direction;
-} Light;
-
-typedef struct TracedSphere {
-    Sphere closestSphere {};
-    float closestT {std::numeric_limits<float>::infinity()};
-    int found {0};
-} TracedSphere;
+#define NUM_BOUNCES 2
+#define NUM_SAMPLES 20
 
 // FUNCTION DECLARATIONS ---------------------------------------------------
 void draw_pixel(SDL_Renderer* renderer, int x, int y, int r, int g, int b);
 Vec3 view_to_canvas(int canvas_x, int canvas_y);
 Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[], Light lights[]);
 Vec2 intersectRaySphere(Vec3 origin, Vec3 direction, Sphere sphere);
-double ComputeLighting(TracedSphere tracedSphere, Sphere scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular);
+double ComputeDirectLighting(TracedSphere tracedSphere, Sphere scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular);
 TracedSphere closest_intersection(TracedSphere tracedSphere, Sphere scene[], Vec3 origin, Vec3 transformed, float tMin, float tMax);
+float trace_ray_path();
 // -------------------------------------------------------------------------
 
 int main() {
@@ -106,9 +49,9 @@ int main() {
     Sphere yellowCircle = {{0,-5001,3}, 5000, {255,255,0}, -1};
     Sphere scene[OBJECTS] = {redCircle, greenCircle, blueCircle, yellowCircle};
 
-    Light ambient = {std::string {"ambient"}, 0.2, Vec3 {0,0,0}};
+    Light ambient = {std::string {"ambient"}, 0, Vec3 {0,0,0}};
     Light point = {std::string {"point"}, 0.6, Vec3 {2,1,0}};
-    Light directional = {std::string {"directional"}, 0.0, Vec3 {1,4,4}};
+    Light directional = {std::string {"directional"}, 0.2, Vec3 {1,4,4}};
     Light lights[3] = {ambient, point, directional};
 
     // ---------- End Model Code --------------------
@@ -166,111 +109,19 @@ Vec3 view_to_canvas(int canvas_x, int canvas_y) {
     return f_array;
 }
 
-/* trace_ray()
+/* trace_ray_path()
  * -----------------------
  * Calculates ray outwards from camera through viewport
  */
-Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[], Light lights[]) {
-    TracedSphere tracedSphere = {Sphere {{0,0,0}, 0, {0,0,0}},
-                                 std::numeric_limits<float>::infinity(), 0};
-    tracedSphere = closest_intersection(tracedSphere, scene, origin, transformed, tMin, tMax);
+float trace_ray_path(int bounces = 0) {
+    float illumination = 0.0;
 
-    if (!tracedSphere.found) {
-        return Vec3i {255, 255, 255};
+    if (bounces < NUM_BOUNCES) {
+        // generate a set of points in a square [1,1] x [1,1]
+        // map those points to a hemisphere
+        // shoot rays out of that hemisphere
+        // if it intersects with an object, add that object's emissivity and call trace_ray_path again
+        // else return 0;
     }
-    Vec3 point = origin.add(transformed.multiplyScalar(tracedSphere.closestT));  // Compute intersection
-    Vec3 normal = point.subtract(tracedSphere.closestSphere.centre); // Compute sphere normal at intersection
-    normal = normal.multiplyScalar(1/normal.length()); // unit normal
-
-    return tracedSphere.closestSphere.color.multiplyScalar(std::clamp(ComputeLighting(tracedSphere, scene, point, normal, transformed.flipped(), lights, tracedSphere.closestSphere.specular), 0.0, 1.0));
-}
-
-/* intersectRaySphere()
- * ----------------------
- * Given a ray from a point with a given direction, check to see if it intersects with a given
- * sphere object
- */
-Vec2 intersectRaySphere(Vec3 origin, Vec3 direction, Sphere sphere) {
-    float r = sphere.radius;
-    Vec3 CO = origin.subtract(sphere.centre);
-
-    float a = direction.dot(direction);
-    float b = CO.dot(direction);
-    b = 2 * b;
-    float c = CO.dot(CO);
-    c = c - (r*r);
-
-    float discriminant = (b*b) - (4*a*c);
-    if (discriminant < 0) {
-        return Vec2 {std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity()};
-    }
-
-    float t1 = ((-b) + sqrt(discriminant)) / (2*a);
-    float t2 = ((-b) - sqrt(discriminant)) / (2*a);
-    return Vec2 {t1, t2};
-}
-
-double ComputeLighting(TracedSphere tracedSphere, Sphere scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular) {
-    double intensity = 0.0;
-
-    for (int i = 0; i < 3; i++) {
-        Light light = lights[i];
-
-        if (light.type == "ambient") {
-            intensity += light.intensity;
-        } else {
-            Vec3 L{};
-            float tMax = 0;
-            if (light.type == "point") {
-                L = light.direction.subtract(point);
-                tMax = 1;
-            }
-             if (light.type == "directional") {
-                L = light.direction;
-                tMax = std::numeric_limits<float>::infinity();
-            }
-
-            // Shadow check
-            TracedSphere shadow = closest_intersection(TracedSphere {.found = 0}, scene, point, L, 0.001, tMax);
-            if (shadow.found) {
-                continue;
-            }
-
-            // diffuse lighting
-            float nDotL = normal.dot(L);
-            if (nDotL > 0) {
-                intensity += light.intensity * nDotL/(normal.length() * L.length());
-            }
-
-            // specular lighting
-            if (specular != -1) {
-                Vec3 R = ((normal.multiplyScalar(2)).multiplyScalar(normal.dot(L))).subtract(L);
-                float rDotV = R.dot(view);
-                if (rDotV > 0) {
-                    intensity += light.intensity * pow(rDotV / (R.length() * view.length()), specular);
-                }
-            }
-        }
-    }
-    return intensity;
-}
-
-TracedSphere closest_intersection(TracedSphere tracedSphere, Sphere scene[], Vec3 origin, Vec3 transformed, float tMin, float tMax) {
-    for (int i = 0; i < OBJECTS; i++) {
-        Sphere sphere = scene[i];
-        Vec2 tValues = intersectRaySphere(origin, transformed, sphere);
-
-        if ((tValues.t1 < tMax) && (tMin < tValues.t1) && (tValues.t1 < tracedSphere.closestT)) {
-            tracedSphere.closestT = tValues.t1;
-            tracedSphere.closestSphere = sphere;
-            tracedSphere.found = 1;
-        }
-
-        if ((tValues.t2 < tMax) && (tMin < tValues.t2) && (tValues.t2 < tracedSphere.closestT)) {
-            tracedSphere.closestT = tValues.t2;
-            tracedSphere.closestSphere = sphere;
-            tracedSphere.found = 1;
-        }
-    }
-    return tracedSphere;
+    return illumination;
 }
