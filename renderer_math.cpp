@@ -21,6 +21,14 @@ Vec3 Vec3::flipped() {
     return Vec3 {-x, -y, -z};
 }
 
+Vec3 Vec3::normalize() {
+    return Vec3 {x/length(), y/length(), z/length()};
+}
+
+Vec3 Vec3::cross(Vec3 b) {
+    return Vec3 {y*b.z - z*b.y, z*b.x - x*b.z, x*b.y - y*b.x};
+}
+
 float Vec3::dot(Vec3 b) {
     return (x * b.x) + (y * b.y) + (z * b.z);
 }

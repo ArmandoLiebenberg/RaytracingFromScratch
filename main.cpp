@@ -1,15 +1,16 @@
 // Libraries
 #include <SDL2/SDL.h>
-#include <valarray>
 #include <string>
+#include <ctime>
 
 // Renderer
+#include "trace_ray_simple.h"
 #include "renderer_math.h"
 #include "objects.h"
 
-#define CANVAS_WIDTH 1920
-#define CANVAS_HEIGHT 1080
-#define VIEW_WIDTH 1.9
+#define CANVAS_WIDTH 600
+#define CANVAS_HEIGHT 600
+#define VIEW_WIDTH 1.0
 #define VIEW_HEIGHT 1.0
 #define DISTANCE 1.0
 #define OBJECTS 6
@@ -17,14 +18,13 @@
 #define NUM_BOUNCES 2
 #define NUM_SAMPLES 20
 
+
+
+
 // FUNCTION DECLARATIONS ---------------------------------------------------
 void draw_pixel(SDL_Renderer* renderer, int x, int y, int r, int g, int b);
 Vec3 view_to_canvas(int canvas_x, int canvas_y);
-Vec3i trace_ray(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[], Light lights[]);
-Vec2 intersectRaySphere(Vec3 origin, Vec3 direction, Sphere sphere);
-double ComputeDirectLighting(TracedSphere tracedSphere, Sphere scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular);
-TracedSphere closest_intersection(TracedSphere tracedSphere, Sphere scene[], Vec3 origin, Vec3 transformed, float tMin, float tMax);
-float trace_ray_path();
+float trace_ray_path(Vec3 origin, Vec3 direction, int bounces);
 // -------------------------------------------------------------------------
 
 int main() {
@@ -59,27 +59,27 @@ int main() {
     // ---------- Graphics Code ------------------------
 
     // place the eye and the frame as desired
-    Vec3 origin = {0, 0, 0};
-    // for each square on the canvas
-    for (int x = -CANVAS_WIDTH/2; x < CANVAS_WIDTH/2; x++) {
-        for (int y = -CANVAS_HEIGHT/2; y < CANVAS_HEIGHT/2; y++) {
-            // Determine which squares on the grid correspond to this square on the canvas
-            Vec3 transformed = view_to_canvas(x, y);
+    while(true) {
+        clock_t timeStart = clock();
 
-            // Determine the color seen through that grid square
-            Vec3i color = trace_ray(origin, transformed, 1, 1000, scene, lights);
+        Vec3 origin = {0, 0, 0};
+        // for each square on the canvas
+        for (int x = -CANVAS_WIDTH / 2; x < CANVAS_WIDTH / 2; x++) {
+            for (int y = -CANVAS_HEIGHT / 2; y < CANVAS_HEIGHT / 2; y++) {
+                // Determine which squares on the grid correspond to this square on the canvas
+                Vec3 transformed = view_to_canvas(x, y);
 
-            // Paint the square with that color
-            draw_pixel(renderer, x, y, color.r, color.g, color.b);
+                // Determine the color seen through that grid square
+                Vec3i color = trace_ray(origin, transformed, 1, 1000, scene, lights);
+
+                // Paint the square with that color
+                draw_pixel(renderer, x, y, color.r, color.g, color.b);
+            }
         }
-    }
-
-    // Render The Stuff
-    while (true) {
+        clock_t timeEnd = clock();
+        printf("Render time: %04.2f\n", (float)(timeEnd - timeStart) / CLOCKS_PER_SEC);
         SDL_RenderPresent(renderer);
-        SDL_Delay(200);
     }
-
 }
 
 /* draw_pixel()
@@ -113,7 +113,7 @@ Vec3 view_to_canvas(int canvas_x, int canvas_y) {
  * -----------------------
  * Calculates ray outwards from camera through viewport
  */
-float trace_ray_path(int bounces = 0) {
+float trace_ray_path(Vec3 origin, Vec3 direction, int bounces = 0) {
     float illumination = 0.0;
 
     if (bounces < NUM_BOUNCES) {

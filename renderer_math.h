@@ -12,6 +12,8 @@ public:
     Vec3 add(Vec3 b);
     Vec3 multiplyScalar(float a);
     Vec3 flipped();
+    Vec3 cross(Vec3 b);
+    Vec3 normalize();
     float dot(Vec3 b);
     float length();
 };
