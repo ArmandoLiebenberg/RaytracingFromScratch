@@ -35,21 +35,21 @@ typedef struct TracedSphere {
 
 class Triangle {
 public:
-    Vec3 v0 {};
-    Vec3 v1 {};
-    Vec3 v2 {};
+    Vec3 v0 {}; // bottom left
+    Vec3 v1 {}; // bottom right
+    Vec3 v2 {}; // top
+    Vec3i color {255, 255, 255};
     Vec3 vertices[3] = {v0, v1, v2};
     Vec3 normal = get_normal(vertices);
 
-    Vec3 get_normal(Vec3 triangle_vertices[3]) {
+    Vec3 get_normal(Vec3 triangle_vertices[3]) const {
         Vec3 A = v1.subtract(v0);
         Vec3 B = v2.subtract(v0);
         Vec3 C = A.cross(B);
         return C = C.normalize();
     }
 
-    bool ray_triangle_intersection(Vec3 origin, Vec3 direction, float &t) {
-
+    bool ray_triangle_intersection(Vec3 origin, Vec3 direction, float *t) const {
         // check if the ray and the triangle are parallel
         if (fabs(normal.dot(direction)) < 0.0001) {
             return false;
@@ -59,15 +59,15 @@ public:
         float d = -normal.dot(v1);
 
         // compute t
-        t = -(normal.dot(origin) + d);
+        *t = -(normal.dot(origin) + d);
 
         // check if triangle is behind ray
-        if (t < 0) {
+        if (*t < 0) {
             return false;
         }
 
         // compute the intersection point
-        Vec3 P = (origin.add(direction.multiplyScalar(t)));
+        Vec3 P = (origin.add(direction.multiplyScalar(*t)));
 
         // inside outside test
         Vec3 C{};
@@ -95,51 +95,54 @@ public:
         if (normal.dot(C) < 0) {
             return false;
         }
-
         return true;
 
     }
 
 };
 
-class cube {
+class Cube {
     // 0------1  4------5
     // |      |  |      |
     // |      |  |      |
     // 2------3  6------7
     // top edges first, then bottom
 public:
-    Vec3 edges[8];
+    Vec3 edges[8]{};
     Triangle triangles[12];
+
+    Cube() {
+        populate_triangles();
+    }
 
     void populate_triangles() {
         edges[0] = {0,1,4};
-        edges[0] = {1,1,4};
-        edges[0] = {0,1,3};
-        edges[0] = {1,1,3};
-        edges[0] = {0,0,4};
-        edges[0] = {1,0,4};
-        edges[0] = {0,0,3};
-        edges[0] = {1,0,3};
+        edges[1] = {1,1,4};
+        edges[2] = {0,1,3};
+        edges[3] = {1,1,3};
+        edges[4] = {0,0,4};
+        edges[5] = {1,0,4};
+        edges[6] = {0,0,3};
+        edges[7] = {1,0,3};
 
         // top
         triangles[0] = Triangle {edges[0], edges[2], edges[3]};
-        triangles[0] = Triangle {edges[0], edges[3], edges[1]};
+        triangles[1] = Triangle {edges[0], edges[3], edges[1]};
         // bottom
-        triangles[0] = Triangle {edges[4], edges[6], edges[7]};
-        triangles[0] = Triangle {edges[4], edges[7], edges[5]};
+        triangles[2] = Triangle {edges[4], edges[6], edges[7]};
+        triangles[3] = Triangle {edges[4], edges[7], edges[5]};
         // front
-        triangles[0] = Triangle {edges[2], edges[6], edges[7]};
-        triangles[0] = Triangle {edges[2], edges[7], edges[3]};
+        triangles[4] = Triangle {edges[2], edges[6], edges[7]};
+        triangles[5] = Triangle {edges[2], edges[7], edges[3]};
         // back
-        triangles[0] = Triangle {edges[1], edges[5], edges[4]};
-        triangles[0] = Triangle {edges[1], edges[4], edges[0]};
+        triangles[6] = Triangle {edges[1], edges[5], edges[4]};
+        triangles[7] = Triangle {edges[1], edges[4], edges[0]};
         // left
-        triangles[0] = Triangle {edges[0], edges[4], edges[6]};
-        triangles[0] = Triangle {edges[0], edges[6], edges[2]};
+        triangles[8] = Triangle {edges[0], edges[4], edges[6]};
+        triangles[9] = Triangle {edges[0], edges[6], edges[2]};
         // right
-        triangles[0] = Triangle {edges[3], edges[7], edges[5]};
-        triangles[0] = Triangle {edges[3], edges[5], edges[1]};
+        triangles[10] = Triangle {edges[3], edges[7], edges[5]};
+        triangles[11] = Triangle {edges[3], edges[5], edges[1]};
     }
 };
 
