@@ -8,11 +8,14 @@
 #include "objects.h"
 
 Vec3i trace_path(Vec3 point, Vec3 direction, Sphere objects[], Light lights[]);
-Vec3i direct_lighting(Vec3 point, Sphere objects[], Light lights[]);
 Vec3 vector_hemisphere(Vec3 point, Vec3 normal);
 Vec3 local_coordinates(Vec3 normal);
 Vec3 sample_hemisphere(float &r1, float &r2);
-bool intersect_ray_object(Vec3 point, Vec3 direction, Sphere objectList[], Sphere closestObject, uint32_t &t);
-float calculate_lighting(Vec3 point, Vec3 direction, Light lights[], float intensity);
+
+Vec3i direct_lighting_sphere(Vec3 origin, Vec3 transformed, Sphere closestSphere, float closestT, Sphere scene[], Light lights[]);
+Vec3i direct_lighting_sphere(Vec3 origin, Vec3 transformed, Sphere closestSphere, float closestT, Sphere scene[], Light lights[]);
+bool intersect_ray_sphere(Vec3 origin, Vec3 direction, Sphere sphere, float &t1, float &t2);
+double compute_direct_lighting_sphere(Sphere scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular);
+bool closest_intersection_sphere(Sphere scene[], Vec3 origin, Vec3 transformed, float tMax, Sphere &closestSphere, float &closestT);
 
 #endif //RAYTRACINGFROMSCRATCH_TRACE_PATH_H

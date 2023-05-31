@@ -8,6 +8,7 @@
 #include "trace_ray_simple.h"
 #include "renderer_math.h"
 #include "objects.h"
+#include "trace_path.h"
 
 #define CANVAS_WIDTH 600
 #define CANVAS_HEIGHT 600
@@ -59,7 +60,7 @@ int main() {
 
     Light ambient = {std::string {"ambient"}, 0, Vec3 {0,0,0}};
     Light point = {std::string {"point"}, 0.6, Vec3 {2,1,0}};
-    Light directional = {std::string {"directional"}, 0.2, Vec3 {1,4,4}};
+    Light directional = {std::string {"directional"}, 0.0, Vec3 {1,4,4}};
     Light lights[LIGHTS] = {ambient, point, directional};
 
     Triangle whiteTriangle = {Vec3 {-1, 0, 3}, Vec3 {1, 0, 3}, Vec3 {0, 1, 3}};
@@ -84,7 +85,7 @@ int main() {
                 Vec3 transformed = view_to_canvas(x, y);
 
                 // Determine the color seen through that grid square
-                Vec3i color = trace_ray_sphere(origin, transformed, 1, 1000, scene, lights);
+                Vec3i color = trace_path(origin, transformed, scene, lights);
 
                 // Paint the square with that color
                 draw_pixel(renderer, x, y, color.r, color.g, color.b);
@@ -121,121 +122,4 @@ Vec3 view_to_canvas(int canvas_x, int canvas_y) {
     f_array.y = (canvas_y * VIEW_HEIGHT/CANVAS_HEIGHT);
     f_array.z = DISTANCE;
     return f_array;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* trace_ray_path()
- * -----------------------
- * Calculates ray outwards from camera through viewport
- */
-Vec3i trace(Vec3 origin, Vec3 direction, Cube* scene[],  int bounces = 0) {
-    Vec3i color = {0,0,0};
-    uint32_t objectIndex;
-    uint32_t triangleIndex;
-    float tNearest;
-
-    if (shoot_primary_ray(origin, direction, scene, objectIndex, triangleIndex, tNearest)) {
-        color.add(scene[objectIndex]->triangles[triangleIndex].color);
-    } else {
-        return Vec3i {0, 0, 0}; // return black if doesn't intersect object
-    }
-
-    //if (bounces < NUM_BOUNCES) {
-        // generate a set of points
-        // map those points to a hemisphere
-        // map the hemisphere to the world coordinates
-        // shoot rays out of that hemisphere
-        // if it intersects with an object, add that object's emissivity and call trace_ray_path again, use the formula for diffuse materials
-        // else return 0;
-    //}
-    return color;
-}
-
-bool shoot_primary_ray(const Vec3& origin, const Vec3& direction, Cube* scene[], uint32_t &objectIndex, uint32_t &triangleIndex, float &tNearest) {
-    tNearest = std::numeric_limits<float>::infinity();  //initialize to infinity
-    bool intersect = false;
-    for (uint32_t k = 0; k < OBJECTS; ++k) {
-        for (uint32_t n = 0; n < 12; ++n) {
-            float t;
-            if ((scene[k]->triangles[n]).ray_triangle_intersection(origin, direction, &t) && t < tNearest) {
-                objectIndex = k;
-                triangleIndex = n;
-                tNearest = t;  //update tNearest with the distance to the closest intersect point found so far
-                intersect |= true;
-            }
-        }
-    }
-
-    return intersect;
-}
-
-double compute_direct_lighting_triangle(Cube scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[]) {
-    double intensity = 0.0;
-
-    for (int i = 0; i < LIGHTS; i++) {
-        Light light = lights[i];
-
-        if (light.type == "ambient") {
-            intensity += light.intensity;
-        } else {
-            Vec3 L{};
-            float tMax = 0;
-            if (light.type == "point") {
-                L = light.direction.subtract(point);
-                tMax = 1;
-            }
-            if (light.type == "directional") {
-                L = light.direction;
-                tMax = std::numeric_limits<float>::infinity();
-            }
-
-            // Shadow check
-            if (closest_intersection_triangle(scene, point, L, 0.001, tMax)) {
-                continue;
-            }
-
-            // diffuse lighting
-            float nDotL = normal.dot(L);
-            if (nDotL > 0) {
-                intensity += light.intensity * nDotL/(normal.length() * L.length());
-            }
-        }
-    }
-    return intensity;
-}
-
-bool closest_intersection_triangle(Cube scene[], Vec3 origin, Vec3 direction, float tMin, float tMax) {
-    for (int i = 0; i < OBJECTS; i++) {
-        for (int j = 0; i < 12; i++) {
-            Triangle triangle = (scene[i]).triangles[j];
-
-            float t;
-            if (triangle.ray_triangle_intersection( origin, direction, &t)) {
-                return true;
-            }
-        }
-    }
-    return false;
 }

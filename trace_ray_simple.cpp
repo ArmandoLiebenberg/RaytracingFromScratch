@@ -12,8 +12,9 @@
  * -----------------------
  * Calculates ray outwards from camera through viewport
  */
-Vec3i trace_ray_sphere(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[], Light lights[]) {
-    TracedSphere tracedSphere = {Sphere {{0,0,0}, 0, {0,0,0}},
+/*
+Vec3i trace_ray_sphere(Vec3 origin, Vec3 transformed, float tMin, float tMax, SphereStruct scene[], Light lights[]) {
+    TracedSphere tracedSphere = {SphereStruct {{0,0,0}, 0, {0,0,0}},
                                  std::numeric_limits<float>::infinity(), 0};
     tracedSphere = closest_intersection_sphere(tracedSphere, scene, origin, transformed, tMin, tMax);
 
@@ -26,7 +27,7 @@ Vec3i trace_ray_sphere(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sp
 
     float illumination = std::clamp(compute_direct_lighting_sphere(tracedSphere, scene, point, normal, transformed.flipped(), lights, tracedSphere.closestSphere.specular), 0.0, 1.0);
     return tracedSphere.closestSphere.color.multiplyScalar(illumination);
-}
+}*/
 
 
 
@@ -35,7 +36,8 @@ Vec3i trace_ray_sphere(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sp
  * Given a ray from a point with a given direction, check to see if it intersects with a given
  * sphere object
  */
-Vec2 intersect_ray_sphere(Vec3 origin, Vec3 direction, Sphere sphere) {
+/*
+Vec2 intersect_ray_sphere(Vec3 origin, Vec3 direction, SphereStruct sphere) {
     float r = sphere.radius;
     Vec3 CO = origin.subtract(sphere.centre);
 
@@ -54,11 +56,13 @@ Vec2 intersect_ray_sphere(Vec3 origin, Vec3 direction, Sphere sphere) {
     float t2 = ((-b) - sqrt(discriminant)) / (2*a);
     return Vec2 {t1, t2};
 }
+ */
 /* ComputeDirectLighting()
  * -----------------------
  * Compute the amount of direct lighting coming from light sources to a given point on a sphere
  */
-double compute_direct_lighting_sphere(TracedSphere tracedSphere, Sphere scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular) {
+/*
+double compute_direct_lighting_sphere(TracedSphere tracedSphere, SphereStruct scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular) {
     double intensity = 0.0;
 
     for (int i = 0; i < 3; i++) {
@@ -106,9 +110,11 @@ double compute_direct_lighting_sphere(TracedSphere tracedSphere, Sphere scene[],
  * -----------------------
  * Given a ray, check if it intersects with any spheres in the scene, and return the closest one
  */
-TracedSphere closest_intersection_sphere(TracedSphere tracedSphere, Sphere scene[], Vec3 origin, Vec3 transformed, float tMin, float tMax) {
+
+/*
+TracedSphere closest_intersection_sphere(TracedSphere tracedSphere, SphereStruct scene[], Vec3 origin, Vec3 transformed, float tMin, float tMax) {
     for (int i = 0; i < OBJECTS; i++) {
-        Sphere sphere = scene[i];
+        SphereStruct sphere = scene[i];
         Vec2 tValues = intersect_ray_sphere(origin, transformed, sphere);
 
         if ((tValues.t1 < tMax) && (tMin < tValues.t1) && (tValues.t1 < tracedSphere.closestT)) {
@@ -124,4 +130,4 @@ TracedSphere closest_intersection_sphere(TracedSphere tracedSphere, Sphere scene
         }
     }
     return tracedSphere;
-}
+} */

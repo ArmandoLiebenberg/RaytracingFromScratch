@@ -6,6 +6,7 @@
 #define RAYTRACINGFROMSCRATCH_OBJECTS_H
 
 #include "renderer_math.h"
+#include <cmath>
 #include <string>
 #include  <limits>
 
@@ -13,13 +14,13 @@
  * ------------------------
  * A sphere object with coordinates and details about its shape and color
  */
-typedef struct Sphere {
+typedef struct SphereStruct {
     Vec3 centre {};
     float radius {};
     Vec3i color {};
     int specular{};
     float emission{};
-} Sphere;
+} SphereStruct;
 
 typedef struct Light {
     std::string type;
@@ -27,11 +28,50 @@ typedef struct Light {
     Vec3 direction;
 } Light;
 
-typedef struct TracedSphere {
-    Sphere closestSphere {};
-    float closestT {std::numeric_limits<float>::infinity()};
-    int found {0};
-} TracedSphere;
+
+
+class Sphere {
+public:
+    Vec3 centre {0,0,0};
+    float radius {1.0};
+    Vec3i color {0,0,0};
+    int specular {0};
+    float emission {0};
+
+    // #TODO remove intersect_ray_sphere from main code and refactor to use this
+     bool intersect_ray_sphere(Vec3 origin, Vec3 direction, float tMax, float tMin, float &distance) const {
+        bool valid = false;
+
+        float r = radius;
+        Vec3 CO = origin.subtract(centre);
+
+        float a = direction.dot(direction);
+        float b = CO.dot(direction);
+        b = 2 * b;
+        float c = CO.dot(CO);
+        c = c - (r*r);
+
+        float discriminant = (b*b) - (4*a*c);
+        if (discriminant < 0) {
+            return valid;
+        }
+
+        float t1 = ((-b) + sqrt(discriminant)) / (2*a);
+        float t2 = ((-b) - sqrt(discriminant)) / (2*a);
+
+        if ((t1 < tMax) && (tMin < t1) && (t1 < distance)) {
+            distance = t1;
+            valid = true;
+        }
+
+        if ((t2 < tMax) && (tMin < t2) && (t2 < distance)) {
+            distance = t2;
+            valid = true;
+        }
+
+        return valid;
+    }
+};
 
 class Triangle {
 public:
@@ -100,6 +140,12 @@ public:
     }
 
 };
+
+typedef struct TracedSphere {
+    Sphere closestSphere {};
+    float closestT {std::numeric_limits<float>::infinity()};
+    int found {0};
+} TracedSphere;
 
 class Cube {
     // 0------1  4------5
