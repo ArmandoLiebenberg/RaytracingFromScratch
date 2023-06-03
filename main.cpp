@@ -10,17 +10,14 @@
 #include "objects.h"
 #include "trace_path.h"
 
-#define CANVAS_WIDTH 600
-#define CANVAS_HEIGHT 600
+#define CANVAS_WIDTH 100
+#define CANVAS_HEIGHT 100
 #define VIEW_WIDTH 1.0
 #define VIEW_HEIGHT 1.0
 #define DISTANCE 1.0
 
 #define LIGHTS 3
 #define OBJECTS 4
-
-#define NUM_BOUNCES 2
-#define NUM_SAMPLES 20
 
 // FUNCTION DECLARATIONS ---------------------------------------------------
 void draw_pixel(SDL_Renderer* renderer, int x, int y, int r, int g, int b);
@@ -85,7 +82,7 @@ int main() {
                 Vec3 transformed = view_to_canvas(x, y);
 
                 // Determine the color seen through that grid square
-                Vec3i color = trace_path(origin, transformed, scene, lights);
+                Vec3i color = trace_path(origin, transformed, scene, lights, 0);
 
                 // Paint the square with that color
                 draw_pixel(renderer, x, y, color.r, color.g, color.b);

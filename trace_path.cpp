@@ -3,6 +3,7 @@
 //
 
 #include <algorithm>
+#include <random>
 #include "trace_path.h"
 #include "objects.h"
 
@@ -10,6 +11,9 @@
 #define OBJECTS 4
 #define TMIN 0.001
 #define TMAX 1000
+
+#define NUM_BOUNCES 1
+#define NUM_SAMPLES 20
 
 /* trace_path()
  * ----------------------------------------
@@ -25,15 +29,16 @@
  * @param Light lights[]
  * @return Vec3i color
  */
-Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[]) {
+Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[], int depth) {
     Vec3i color = {0,0,0};
+    Vec3i indirectDiffuse {0,0,0};
 
     // check if ray from origin in direction intersects with object, set the closest object
     Sphere closestObject;
     float closestT = std::numeric_limits<float>::infinity();
-    if (!closest_intersection_sphere(objects, origin, direction, 1000,  closestObject, closestT)) {
+    if (!closest_intersection_sphere(objects, origin, direction, TMAX,  closestObject, closestT)) {
         // if no, return black
-        Vec3i red = {255,255,255};
+        Vec3i red = {0,0,0};
         return red;
     }
 
@@ -45,18 +50,44 @@ Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[]) 
     // calculate direct lighting
     color = color.add(direct_lighting_sphere(origin, direction, closestObject, closestT, objects, lights));
 
-    // build local coordinate system
-    //Vec3 localCoordinates = local_coordinates(normal);
+    // check if max depth was reached
+    if (depth >= NUM_BOUNCES) {
+        return color;
+    }
 
-    // sample the hemisphere
-    //float r1 = 0;
-    //float r2 = 0;
-    //Vec3 sample = sample_hemisphere(r1, r2);
+    // generate sample points on origin local coordinates hemisphere
+    Vec3 normalTangent {};
+    Vec3 normalBiTangent {};
+    local_coordinates(normal, normalTangent, normalBiTangent);
 
-    // transform local coordinate hemisphere
-    //sample = vector_hemisphere(sample, normal);
+    // Code taken from https://en.cppreference.com/w/cpp/numeric/random/uniform_real_distribution
+    std::random_device rd;  // Will be used to obtain a seed for the random number engine
+    std::mt19937 generator(rd()); // Standard mersenne_twister_engine seeded with rd()
+    std::uniform_real_distribution<float> distribution(0.0, 1.0);
 
-    // recursively call trace_path and add to intensity
+    // generate points in a hemisphere and transform to point local coordinates
+    for (int i = 0; i < NUM_SAMPLES; i++) {
+        float r1 = distribution(generator);
+        float r2 = distribution(generator);
+        Vec3 s = sample_hemisphere(r1, r2);
+        Vec3 sample = {s.x * normalBiTangent.x + s.y * normal.x + s.z * normalTangent.x,
+                  s.x * normalBiTangent.y + s.y * normal.y + s.z * normalTangent.y,
+                  s.x * normalBiTangent.z + s.y * normal.z + s.z * normalTangent.z,};
+
+        // recursively call trace_path and add to intensity
+        indirectDiffuse.add(trace_path(point.add(sample.multiplyScalar(0.0001)), sample, objects, lights, depth+1).multiplyScalar(r1));
+        printf("indirect %d is: %d %d %d\n", i, indirectDiffuse.r, indirectDiffuse.g, indirectDiffuse.b);
+
+    }
+    // divide by N and the constant PDF
+    indirectDiffuse.multiplyScalar(1/(NUM_SAMPLES * (1 / (2 * M_PI))));
+
+    // add indirect diffuse
+    //printf("%d, %d, %d\n", indirectDiffuse.r, indirectDiffuse.g, indirectDiffuse.b);
+    color.add(indirectDiffuse);
+
+    // multiply by object albedo
+    color.multiplyScalar(0.18/M_PI);
 
     return color;
 }
@@ -71,21 +102,28 @@ Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[]) 
  * @param vec3 normal
  * @return Vec3 sampledVector
  */
-Vec3 vector_hemisphere(Vec3 point, Vec3 normal){
-    return Vec3{};
+void vector_hemisphere(Vec3 (&sample)[NUM_SAMPLES], Vec3 point, Vec3 normal){
+
 }
 
 /* local_coordinates()
  * ----------------------------------------
- * We build a vector containing the normal of our point, the tangent, and
- * the bi-tangent. We use this to transform vectors into our point's local
- * coordinates
+ * We build the tangent, and the bi-tangent vectors of our point.
+ * We use this to transform vectors into our point's local coordinates
  *
  * @param Vec3 normal
- * @return Vec3 localCoordinates
+ * @param Vec3 normalTangent
+ * @param Vec3 normalBiTangent
  */
-Vec3 local_coordinates(Vec3 normal){
-    return Vec3{};
+void local_coordinates(Vec3 &normal, Vec3 &normalTangent, Vec3 &normalBiTangent) {
+    if (std::fabs(normal.x) > std::fabs(normal.y)) {
+        float div = sqrt(normal.x * normal.x + normal.z * normal.z);
+        normalTangent = Vec3 {normal.z/div, 0, -normal.x/div};
+    } else {
+        float div = sqrt(normal.y * normal.y + normal.z * normal.z);
+        normalTangent = Vec3 {0, -normal.z/div, normal.y/div};
+    }
+    normalBiTangent = normal.cross(normalTangent);
 }
 
 /* sample_hemisphere()
@@ -97,8 +135,16 @@ Vec3 local_coordinates(Vec3 normal){
  * @param[out] Float r2
  * @return Vec3 randomSample
  */
-Vec3 sample_hemisphere(float &r1, float &r2){
-    return Vec3{};
+Vec3 sample_hemisphere(const float &r1, const float &r2){
+    Vec3 randomSample = {};
+    float sinTheta = sqrt(1 - r1 * r1);
+    float phi = 2 * M_PI * r2;
+
+    randomSample.x = sinTheta * cos(phi);
+    randomSample.y = r1;
+    randomSample.z = sinTheta * sin(phi);
+
+    return randomSample;
 }
 
 /* direct_lighting_sphere()
