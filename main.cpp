@@ -10,8 +10,8 @@
 #include "objects.h"
 #include "trace_path.h"
 
-#define CANVAS_WIDTH 100
-#define CANVAS_HEIGHT 100
+#define CANVAS_WIDTH 600
+#define CANVAS_HEIGHT 600
 #define VIEW_WIDTH 1.0
 #define VIEW_HEIGHT 1.0
 #define DISTANCE 1.0
@@ -22,14 +22,6 @@
 // FUNCTION DECLARATIONS ---------------------------------------------------
 void draw_pixel(SDL_Renderer* renderer, int x, int y, int r, int g, int b);
 Vec3 view_to_canvas(int canvas_x, int canvas_y);
-
-float trace_ray_path(Vec3 origin, Vec3 direction, int bounces);
-double compute_direct_lighting_triangle(Cube scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[]);
-bool closest_intersection_triangle(Cube scene[], Vec3 origin, Vec3 direction, float tMin, float tMax);
-bool shoot_primary_ray(const Vec3& origin, const Vec3& direction, Cube* scene[], uint32_t &objectIndex, uint32_t &triangleIndex, float &tNearest);
-Vec3i trace(Vec3 origin, Vec3 direction, Cube* scene[],  int bounces);
-
-Vec3i render(Vec3 origin, Vec3 transformed, float tMin, float tMax, Sphere scene[], Light lights[]);
 // -------------------------------------------------------------------------
 
 int main() {
@@ -56,7 +48,7 @@ int main() {
     Sphere scene[OBJECTS] = {redCircle, greenCircle, blueCircle, yellowCircle};
 
     Light ambient = {std::string {"ambient"}, 0, Vec3 {0,0,0}};
-    Light point = {std::string {"point"}, 0.6, Vec3 {2,1,0}};
+    Light point = {std::string {"point"}, 0.8, Vec3 {2,1,0}};
     Light directional = {std::string {"directional"}, 0.0, Vec3 {1,4,4}};
     Light lights[LIGHTS] = {ambient, point, directional};
 
@@ -77,6 +69,11 @@ int main() {
         Vec3 origin = {0, 0, 0};
         // for each square on the canvas
         for (int x = -CANVAS_WIDTH / 2; x < CANVAS_WIDTH / 2; x++) {
+            if (x % 100 == 0) {
+                printf("%d percent\n", x);
+                fflush(stdout);
+            }
+
             for (int y = -CANVAS_HEIGHT / 2; y < CANVAS_HEIGHT / 2; y++) {
                 // Determine which squares on the grid correspond to this square on the canvas
                 Vec3 transformed = view_to_canvas(x, y);

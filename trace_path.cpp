@@ -12,7 +12,7 @@
 #define TMIN 0.001
 #define TMAX 1000
 
-#define NUM_BOUNCES 1
+#define NUM_BOUNCES 2
 #define NUM_SAMPLES 20
 
 /* trace_path()
@@ -38,8 +38,7 @@ Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[], 
     float closestT = std::numeric_limits<float>::infinity();
     if (!closest_intersection_sphere(objects, origin, direction, TMAX,  closestObject, closestT)) {
         // if no, return black
-        Vec3i red = {0,0,0};
-        return red;
+        return color;
     }
 
     // calculate the point hit and the unit normal from that point
@@ -52,6 +51,7 @@ Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[], 
 
     // check if max depth was reached
     if (depth >= NUM_BOUNCES) {
+        //color = color.multiplyScalar(1.0/M_PI);
         return color;
     }
 
@@ -65,6 +65,8 @@ Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[], 
     std::mt19937 generator(rd()); // Standard mersenne_twister_engine seeded with rd()
     std::uniform_real_distribution<float> distribution(0.0, 1.0);
 
+    float pdf = 1 / (2 * M_PI);
+
     // generate points in a hemisphere and transform to point local coordinates
     for (int i = 0; i < NUM_SAMPLES; i++) {
         float r1 = distribution(generator);
@@ -75,20 +77,21 @@ Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[], 
                   s.x * normalBiTangent.z + s.y * normal.z + s.z * normalTangent.z,};
 
         // recursively call trace_path and add to intensity
-        indirectDiffuse.add(trace_path(point.add(sample.multiplyScalar(0.0001)), sample, objects, lights, depth+1).multiplyScalar(r1));
-        printf("indirect %d is: %d %d %d\n", i, indirectDiffuse.r, indirectDiffuse.g, indirectDiffuse.b);
+        Vec3i indirect_color = trace_path(point.add(sample.multiplyScalar(0.0001)), sample, objects, lights, depth+1);
+        indirect_color = indirect_color.multiplyScalar(r1);
+        indirectDiffuse = indirectDiffuse.add(indirect_color);
 
     }
     // divide by N and the constant PDF
-    indirectDiffuse.multiplyScalar(1/(NUM_SAMPLES * (1 / (2 * M_PI))));
+    indirectDiffuse = indirectDiffuse.multiplyScalar(1.0/NUM_SAMPLES);
 
     // add indirect diffuse
-    //printf("%d, %d, %d\n", indirectDiffuse.r, indirectDiffuse.g, indirectDiffuse.b);
-    color.add(indirectDiffuse);
+    color = color.add(indirectDiffuse);
 
     // multiply by object albedo
-    color.multiplyScalar(0.18/M_PI);
+    //color = color.multiplyScalar(0.18/M_PI);
 
+    color = Vec3i {(std::clamp(color.r, 0, 255)), (std::clamp(color.g, 0, 255)), (std::clamp(color.b, 0, 255))};
     return color;
 }
 
