@@ -41,10 +41,10 @@ int main() {
 
     // ---------- Model Code ------------------------
 
-    Sphere redCircle = {{0,-0.5,3}, 1, {255,0,0}, 500 };
-    Sphere blueCircle = {{2,0.0,4}, 1, {0,0,255}, -1};
-    Sphere greenCircle = {{-2,0.0,4}, 1, {0,0,255}, -1};
-    Sphere yellowCircle = {{0,-5001,3}, 5000, {255,255,0}, -1};
+    Sphere redCircle = {{0,-0.5,3}, 1, {255,0,0}, -1, 0.0};
+    Sphere blueCircle = {{2,0.0,4}, 1, {0,0,255}, -1, 0.0};
+    Sphere greenCircle = {{-2,0.0,4}, 1, {0,0,255}, -1, 0.0};
+    Sphere yellowCircle = {{0,-5001,3}, 5000, {255,255,255}, -1, 0.0};
     Sphere scene[OBJECTS] = {redCircle, greenCircle, blueCircle, yellowCircle};
 
     Light ambient = {std::string {"ambient"}, 0, Vec3 {0,0,0}};

@@ -7,13 +7,13 @@
 #include "trace_path.h"
 #include "objects.h"
 
-#define LIGHTS 2
+#define LIGHTS 3
 #define OBJECTS 4
 #define TMIN 0.001
 #define TMAX 1000
 
-#define NUM_BOUNCES 2
-#define NUM_SAMPLES 20
+#define NUM_BOUNCES 1
+#define NUM_SAMPLES 100
 
 /* trace_path()
  * ----------------------------------------
@@ -49,6 +49,9 @@ Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[], 
     // calculate direct lighting
     color = color.add(direct_lighting_sphere(origin, direction, closestObject, closestT, objects, lights));
 
+    // add sphere emission
+    //color = color.add(closestObject.color.multiplyScalar(closestObject.emission));
+
     // check if max depth was reached
     if (depth >= NUM_BOUNCES) {
         //color = color.multiplyScalar(1.0/M_PI);
@@ -77,19 +80,25 @@ Vec3i trace_path(Vec3 origin, Vec3 direction, Sphere objects[], Light lights[], 
                   s.x * normalBiTangent.z + s.y * normal.z + s.z * normalTangent.z,};
 
         // recursively call trace_path and add to intensity
-        Vec3i indirect_color = trace_path(point.add(sample.multiplyScalar(0.0001)), sample, objects, lights, depth+1);
-        indirect_color = indirect_color.multiplyScalar(r1);
-        indirectDiffuse = indirectDiffuse.add(indirect_color);
-
+        Vec3i indirectLighting = trace_path(point.add(sample.multiplyScalar(0.0001)), sample, objects, lights, depth+1);
+        // multiply by cos(theta)
+        indirectLighting = indirectLighting.multiplyScalar(r1);
+        // divide by theta
+        indirectLighting = indirectLighting.multiplyScalar(1/pdf);
+        indirectDiffuse = indirectDiffuse.add(indirectLighting);
     }
+
     // divide by N and the constant PDF
     indirectDiffuse = indirectDiffuse.multiplyScalar(1.0/NUM_SAMPLES);
 
+    // multiply by object albedo * 2
+    indirectDiffuse = indirectDiffuse.multiplyScalar(2*0.18);
+
+    // multiply the direct lighting by albedo/M_PI
+    //color = color.multiplyScalar(0.18/M_PI);
+
     // add indirect diffuse
     color = color.add(indirectDiffuse);
-
-    // multiply by object albedo
-    //color = color.multiplyScalar(0.18/M_PI);
 
     color = Vec3i {(std::clamp(color.r, 0, 255)), (std::clamp(color.g, 0, 255)), (std::clamp(color.b, 0, 255))};
     return color;
@@ -171,7 +180,7 @@ Vec3i direct_lighting_sphere(Vec3 origin, Vec3 transformed, Sphere closestSphere
     Vec3 normal = point.subtract(closestSphere.centre); // Compute sphere normal at intersection
     normal = normal.multiplyScalar(1/normal.length()); // unit normal
 
-    float illumination = std::clamp(compute_direct_lighting_sphere(scene, point, normal, transformed.flipped(), lights, closestSphere.specular), 0.0, 1.0);
+    float illumination = std::clamp(compute_direct_lighting_sphere(scene, point, normal, transformed.flipped(), lights, closestSphere.specular), 0.0, 100.0);
     return closestSphere.color.multiplyScalar(illumination);
 }
 
@@ -224,7 +233,7 @@ bool intersect_ray_sphere(Vec3 origin, Vec3 direction, Sphere sphere, float &t1,
 double compute_direct_lighting_sphere(Sphere scene[], Vec3 point, Vec3 normal, Vec3 view, Light lights[], int specular) {
     double intensity = 0.0;
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < LIGHTS; i++) {
         Light light = lights[i];
 
         if (light.type == "ambient") {
